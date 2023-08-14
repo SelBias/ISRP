@@ -1,0 +1,15 @@
+# library(rstudioapi)
+# setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # set dir
+
+source("./Reproduction/A1_10.R")
+rm(list = ls())
+source("./Reproduction/A1_30.R")
+rm(list = ls())
+source("./Reproduction/A1_50.R")
+rm(list = ls())
+source("./Reproduction/A1_50_02.R")
+rm(list = ls())
+source("./Reproduction/A1_50_005.R")
+rm(list = ls())
+source("./Reproduction/A1_50_0025.R")
+rm(list = ls())
