@@ -6,7 +6,7 @@ library(restriktor)
 library(glmnet)
 
 library(ggplot2)
-# library(reshape2)
+library(reshape2)
 # library(ggpubr)
 
 source("./posterior_inference.R")
@@ -22,6 +22,7 @@ set.seed(7)
 # Hyperparameter for BICLS
 beta_init = c(-0.5, -0.5, 0.5, 0.5, 0.5, rep(0, 25))
 sigma_sq_init = 1
+# c_0 = 2 / sqrt(2 * lambda)
 nu_0 = 0.02
 s_0 = 0.02
 rho = 0.0
@@ -68,14 +69,19 @@ b = rep(0,5)
 ##### Parameter estimation #####
 ################################
 
+lamb_list = unlist(lapply(1:repitition, function(n) {
+    X = X_list[[n]]
+    y = y_list[[n]]
+
+    cv.glmnet(X, y, intercept=FALSE, alpha=0)$lambda.min
+}))
+
 # ridge estimates
 fit_ridge = lapply(1:repitition, function(n) {
     X = X_list[[n]]
     y = y_list[[n]]
 
-    lamb = cv.glmnet(X, y, intercept=FALSE, alpha=0)$lambda.min
-
-    glmnet(X, y, intercept=F, alpha=0, lambda=lamb)
+    glmnet(X, y, intercept=F, alpha=0, lambda=lamb_list[n])
 })
 
 beta_ridge = sapply(fit_ridge, function(fit) {
@@ -99,12 +105,12 @@ fit_BICLS = lapply(
         X = X_list[[n]]
         y = y_list[[n]]
 
-        lamb = cv.glmnet(X, y, intercept=FALSE, alpha=0)$lambda.min
+
         
         lm_post_wo_equality(
             X, y, R, b, 
             beta_init, sigma_sq_init, 
-            mu_0, Sigma_0, c_0 = lamb, 
+            mu_0, Sigma_0, c_0 = 2 / sqrt(2 * lamb_list[n]), 
             nu_0, s_0, empirical_bayes, 
             n_sample, thin, burn, beta_burn
         )$beta_samples
@@ -124,63 +130,43 @@ beta_diff_BICLS = beta_BICLS - beta_true
 ###########################
 
 # Table 2
-table_1 = cbind(
+table_2 = cbind(
     rowMeans(beta_diff_BICLS^2),
-    rowMeans(beta_diff_ICLS^2),
-    rowMeans(beta_diff_ICLS^2) / rowMeans(beta_diff_BICLS^2),
-    rowMeans(beta_diff_OLS^2),
-    rowMeans(beta_diff_OLS^2) / rowMeans(beta_diff_BICLS^2), 
-    apply(beta_diff_BICLS, 1, var),
-    apply(beta_diff_ICLS, 1, var),
-    apply(beta_diff_ICLS, 1, var) / apply(beta_diff_BICLS, 1, var),
-    apply(beta_diff_OLS, 1, var),
-    apply(beta_diff_OLS, 1, var) / apply(beta_diff_BICLS, 1, var)
+    rowMeans(beta_diff_ridge^2),
+    rowMeans(beta_diff_ridge^2) / rowMeans(beta_diff_BICLS^2)
 )
 
+# View(beta_diff_BICLS[1:5,])
+# View(beta_diff_ridge[1:5,])
+
+sse_ridge = apply(
+    beta_diff_ridge, 2, function(beta_diff) {
+        sum(beta_diff^2)
+})
+
+sse_BICLS = apply(
+    beta_diff_BICLS, 2, function(beta_diff) {
+        sum(beta_diff^2)
+})
+
 # fig 2
-beta1 = data.frame(cbind(beta_diff_BICLS[1,], beta_diff_ICLS[1,], beta_diff_OLS[1,]))
-colnames(beta1) = c("BICLS", "ICLS", "OLS")
-beta2 = data.frame(cbind(beta_diff_BICLS[2,], beta_diff_ICLS[2,], beta_diff_OLS[2,]))
-colnames(beta2) = c("BICLS", "ICLS", "OLS")
-beta3 = data.frame(cbind(beta_diff_BICLS[3,], beta_diff_ICLS[3,], beta_diff_OLS[3,]))
-colnames(beta3) = c("BICLS", "ICLS", "OLS")
+sse = data.frame(cbind(sse_BICLS, sse_ridge))
+colnames(sse) = c("BICLS", "Ridge")
 
-plot1 = ggplot(data = melt(beta1), aes(x=variable, y=value)) + 
+fig_2 = ggplot(data = melt(sse), aes(x=variable, y=value)) + 
     theme_bw() + 
     theme(text = element_text(size = 20)) + 
-    ylab("Beta1") + 
+    ylab("Sum of squared errors") + 
     xlab("") + 
-    geom_boxplot(aes()) + 
-    geom_hline(aes(yintercept = 0), col = 'red')
+    ylim(5, 20) + 
+    geom_boxplot(aes())
 
-plot2 = ggplot(data = melt(beta2), aes(x=variable, y=value)) + 
-    theme_bw() + 
-    theme(text = element_text(size = 20)) + 
-    ylab("Beta2") + 
-    xlab("") + 
-    geom_boxplot(aes()) + 
-    geom_hline(aes(yintercept = 0), col = 'red')
-
-plot3 = ggplot(data = melt(beta3), aes(x=variable, y=value)) + 
-    theme_bw() + 
-    theme(text = element_text(size = 20)) +  
-    ylab("Beta3") + 
-    xlab("") + 
-    geom_boxplot(aes()) + 
-    geom_hline(aes(yintercept = 0), col = 'red')
-
-
-fig_1 = ggpubr::ggarrange(plot1, plot2, plot3, nrow = 1)
+fig_2
 
 #########################
 #####  Save results #####
 #########################
 
-# ggsave(plot1, filename="./fig/fig1_beta1.png", width = 3.5, height = 7)
-# ggsave(plot2, filename="./fig/fig1_beta2.png", width = 3.5, height = 7)
-# ggsave(plot3, filename="./fig/fig1_beta3.png", width = 3.5, height = 7)
-# ggsave(fig_1, filename="./fig/fig1.png", width = 10.5, height = 7)
-
-# write.csv(table_1, file = paste0("./data/table_1_", sample_size, ".csv"), fileEncoding = "UTF-8")
-# write.csv(table_s1, file = paste0("./data/table_s1_", sample_size, ".csv"), fileEncoding= "UTF-8")
-# save(list = ls(all.names=TRUE), file = paste0("./data/A1_", sample_size, ".Rdata"))
+ggsave(fig_2, filename=paste0("./fig/fig2_rho_", rho, ".png"), width = 6, height = 7)
+write.csv(table_2, file = paste0("./data/table_2_rho_", rho, ".csv"), fileEncoding = "UTF-8")
+save(list = ls(all.names=TRUE), file = paste0("./data/A2_rho_", rho, ".Rdata"))
