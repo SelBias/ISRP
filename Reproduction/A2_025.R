@@ -9,7 +9,7 @@ library(ggplot2)
 library(reshape2)
 # library(ggpubr)
 
-source("./posterior_inference.R")
+source("./post_inference_wo_equality.R")
 
 #################################
 #####     Simulation A1     #####

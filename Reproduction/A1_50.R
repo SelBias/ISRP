@@ -9,7 +9,7 @@ library(reshape2)
 # library(ggpubr)
 
 # setwd(dirname(rstudioapi::getActiveDocumentContext()$path)) # set dir
-source("./posterior_inference.R")
+source("./post_inference_wo_equality.R")
 
 #################################
 #####     Simulation A1     #####
