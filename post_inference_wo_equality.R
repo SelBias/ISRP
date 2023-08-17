@@ -43,15 +43,16 @@ lm_post_wo_equality = function(
 
 
     # initialization
-    if (is.null(alpha)) alpha = rep(0, n)
+    if (is.null(alpha)) 
+        alpha = rep(0, n)
 
     if (empirical_bayes) {
-        freq_model = lm(y ~ X - 1)
+        freq_model = lm(y ~ X - 1, offset = alpha)
         
         # beta_init = coef(temp_res)
         sigma_sq_init = var(freq_model$residuals)
 
-        mu_0 = coef(freq_model)
+        beta_init = mu_0 = coef(freq_model)
         Sigma_0 = vcov(freq_model)
     }  else {
         if (is.null(mu_0)) mu_0 = rep(0, p)
@@ -82,7 +83,7 @@ lm_post_wo_equality = function(
         beta_post = tmvmixnorm::rtmvn(
             n=1, Mean=tilde_mu, Sigma=tilde_Sigma, 
             D=R, lower = b, upper = rep(Inf, m), 
-            int=beta_init, burn=beta_burn
+            int=beta_post, burn=beta_burn
         )
 
         # Gibbs sampler for sigma_sq | X, y, beta
@@ -145,15 +146,17 @@ poisson_log_post_wo_equality = function(
 
     N = burn + n_sample * thin
 
-
     # initialization
-    if (is.null(alpha)) alpha = rep(0, n)
+    if (is.null(alpha)) 
+        alpha = rep(0, n)
 
     if (empirical_bayes) {
-        freq_model = glm(y ~ X - 1, alpha = alpha, family = poisson(link = "log"))
+        freq_model = glm(y ~ X - 1, offset = alpha, family = poisson(link = "log"))
         
         mu_0 = coef(freq_model)
         Sigma_0 = vcov(freq_model)
+
+        # Sigma_0 = t(X) %*% diag(exp(as.vector(X %*% mu_0))) %*% X
     }  else {
         if (is.null(mu_0)) mu_0 = rep(0, p)
         if (is.null(Sigma_0)) Sigma_0 = diag(c_0^2, p, p)
@@ -177,10 +180,19 @@ poisson_log_post_wo_equality = function(
         beta_post = tmvmixnorm::rtmvn(
             n=1, Mean=tilde_mu, Sigma=Sigma_0, 
             D=tilde_R, lower = tilde_b, upper = rep(Inf, n+m), 
-            int=beta_init, burn=beta_burn
+            int=beta_post, burn=beta_burn
         )
 
+        # print(u)
+        # print(-log(u))
+        # print(log(-log(u)))
+        # print(tilde_b)
+        # print(as.vector(tilde_R %*% beta_post - tilde_b))
 
+        # print(tilde_R)
+        # print(tilde_b)
+        # print(beta_post)
+        # print(as.vector(tilde_R %*% beta_post - b))
         # burning & thinning
         if(i > burn && (i - burn) %% thin ==0) {
             ind = (i - burn) / thin
@@ -241,7 +253,7 @@ poisson_iden_post_wo_equality = function(
     if (is.null(alpha)) alpha = rep(0, n)
 
     if (empirical_bayes) {
-        freq_model = glm(y ~ X - 1, alpha = alpha, family = poisson(link = "identity"))
+        freq_model = glm(y ~ X - 1, offset = alpha, family = poisson(link = "identity"))
         
         mu_0 = coef(freq_model)
         Sigma_0 = vcov(freq_model)
@@ -275,7 +287,7 @@ poisson_iden_post_wo_equality = function(
         beta_post = tmvmixnorm::rtmvn(
             n=1, Mean=tilde_mu, Sigma=Sigma_0, 
             D=tilde_R, lower = tilde_b, upper = rep(Inf, n+m), 
-            int=beta_init, burn=beta_burn
+            int=beta_post, burn=beta_burn
         )
 
         # burning & thinning
@@ -287,3 +299,4 @@ poisson_iden_post_wo_equality = function(
 
     return(beta_samples)
 }
+
