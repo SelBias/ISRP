@@ -159,3 +159,43 @@ poisson_log_post_with_equality = function(
 
     return(recovered_beta_samples)
 }
+
+poisson_iden_post_with_equality = function(
+    X, y, R, b, l, 
+    beta_init = NULL, 
+    mu_0 = NULL, Sigma_0 = NULL, c_0 = 3, empirical_bayes = FALSE, 
+    n_sample = 1000, thin = 1, burn = 1000, beta_burn = 10
+) {
+    n = nrow(X)
+    p = ncol(X)
+    m = nrow(R)
+
+    if (l == 0) {
+        return(poisson_log_post_wo_equality(
+            X = X, y = y, R = R, b = b, alpha = NULL, 
+            beta_init = beta_init, 
+            mu_0 = mu_0, Sigma_0 = Sigma_0, c_0 = c_0, empirical_bayes = empirical_bayes, 
+            n_sample = n_sample, thin = thin, burn = burn, beta_burn = 10
+        ))
+    }
+
+    remove_list = remove_equality_condition(X, R, b, l)
+
+    new_beta_init = NULL
+    new_mu_0 = NULL
+    new_Sigma_0 = NULL
+    if (!is.null(beta_init)) new_beta_init = beta_init[(l+1):p]
+    if (!is.null(mu_0)) new_mu_0 = mu_0[(l+1):p]
+    if (!is.null(Sigma_0)) new_Sigma_0 = Sigma_0[(l+1):p, (l+1):p]
+
+    transformed_samples = poisson_iden_post_wo_equality(
+        X = remove_list$new_X, y = y, R = remove_list$new_R, b = remove_list$new_b, alpha = remove_list$alpha, 
+        beta_init = new_beta_init, 
+        mu_0 = new_mu_0, Sigma_0 = new_Sigma_0, c_0 = c_0, empirical_bayes = empirical_bayes, 
+        n_sample = n_sample, thin = thin, burn = burn, beta_burn = beta_burn
+    )
+
+    recovered_beta_samples = remove_list$recover_mat %*% transformed_samples + remove_list$recover_bias
+
+    return(recovered_beta_samples)
+}
